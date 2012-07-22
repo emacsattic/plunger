@@ -4,7 +4,7 @@
 
 ;; Author: Jonas Bernoulli <jonas@bernoul.li>
 ;; Created: 20120112
-;; Version: 0.1.0
+;; Version: 0.2.0
 ;; Status: beta
 ;; Homepage: http://github.com/tarsius/plunger
 ;; Keywords: compile, convenience, lisp
@@ -28,6 +28,10 @@
 
 ;; This library provides function `plunger-import' which
 ;; creates a commit from a file downloaded from the web.
+
+;; The plan was to also directly create commits from tarballs
+;; and files whose url first have to be extracted from a webpage.
+;; Unfortunatly I lost interested before that was implemented.
 
 ;;; Code:
 
@@ -72,51 +76,6 @@
     (plunger-region-blob (point-min) (point-max) filename nil buf)
     (with-current-buffer buf
       (plunger-region-mktree (point-min) (point-max)))))
-
-;;; Import tarball.
-;;
-;; NOT IMPLEMENTED.
-
-(defconst plunger-archive-regexp
-  (concat (regexp-opt '(".tar" ".tar.gz" ".tar.bz2" ".tgz" ".tbz")) "$"))
-
-;;; Determine latest version by comparing links on a webpage.
-;;
-;; LIKELY BROKEN.
-
-(defvar vcomp--regexp)
-
-(defun plunger-import* (url &optional message filename index prefix)
-  (let (resolved)
-    (if (string-match "%v" url)
-        (unless (setq resolved (plunger-webpage-head url index))
-          (error "Resolving %s failed" url))
-      (setq resolved url))
-    (plunger-import resolved filename message)))
-
-(defun plunger-webpage-head (url index &optional prefix)
-  (require 'vcomp)
-  (setq url (regexp-quote url))
-  (let ((regexp (format "<a[^>]+href=[\"']?\\(%s\\)[\"']?[^>]*>"
-			(replace-regexp-in-string
-			 "%v" (substring vcomp--regexp 1 -1)
-			 url nil t)))
-        (buffer (condition-case-unless-debug nil
-                    (url-retrieve-synchronously index)
-                  (error nil)))
-        matches href)
-    (when buffer
-      (with-current-buffer buffer
-        (goto-char (point-min))
-        (while (re-search-forward regexp nil t)
-          (push (cons (match-string 1) (match-string 2)) matches)))
-      (kill-buffer buffer)
-      (setq href (caar (last (sort* matches 'vcomp< :key 'cdr))))
-      (cond ((not href) nil)
-            ((string-match "^https?://" href) href)
-            (prefix (concat prefix href))
-            ((string-match "^https?://[^/]+" index)
-             (concat (match-string 0 index) href))))))
 
 (provide 'plunger-import)
 ;; Local Variables:
