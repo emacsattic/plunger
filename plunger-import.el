@@ -46,10 +46,10 @@
     (with-current-buffer buffer
       (setq response (url-http-parse-response))
       (when (or (<  response 200)
-		(>= response 300))
-	(error "Error during download request: %s"
-	       (buffer-substring-no-properties
-		(point) (progn (end-of-line) (point)))))
+                (>= response 300))
+        (error "Error during download request: %s"
+               (buffer-substring-no-properties
+                (point) (progn (end-of-line) (point)))))
       (re-search-forward "^$" nil 'move)
       (forward-char)
       (delete-region (point-min) (point))
@@ -67,11 +67,11 @@
 (defun plunger-import-single (url filename)
   (unless filename
     (setq filename
-	  (if (magit-no-commit-p)
-	      (if (string-match "\\([^/]+\\)$" url)
-		  (match-string 1 url)
-		(error "Cannot determine local filename"))
-	    (car (magit-git-lines "ls-tree" "--name-only" "HEAD")))))
+          (if (magit-no-commit-p)
+              (if (string-match "\\([^/]+\\)$" url)
+                  (match-string 1 url)
+                (error "Cannot determine local filename"))
+            (car (magit-git-lines "ls-tree" "--name-only" "HEAD")))))
   (let ((buf (plunger--get-buffer " *plunger-mktree*")))
     (plunger-region-blob (point-min) (point-max) filename nil buf)
     (with-current-buffer buf
