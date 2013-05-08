@@ -40,10 +40,11 @@
 (require 'plunger)
 (require 'url-http)
 
-(defun plunger-import (url &optional filename message)
-  (let ((buffer (url-retrieve-synchronously url))
+(defun plunger-pull-file (url &optional filename message)
+  (let ((http-buf (url-retrieve-synchronously url))
+        (tree-buf (plunger--get-buffer " *plunger-mktree*"))
         response tree)
-    (with-current-buffer buffer
+    (with-current-buffer http-buf
       (setq response (url-http-parse-response))
       (when (or (<  response 200)
                 (>= response 300))
@@ -54,28 +55,24 @@
       (forward-char)
       (delete-region (point-min) (point))
       (mm-decompress-buffer (file-name-nondirectory url) t t)
-      ;; that's the only importer that currently exists
-      (setq tree (plunger-import-single url filename)))
-    (kill-buffer buffer)
+      (unless filename
+        (setq filename
+              (if (magit-no-commit-p)
+                  (if (string-match "\\([^/]+\\)$" url)
+                      (match-string 1 url)
+                    (error "Cannot determine local filename"))
+                (car (magit-git-lines "ls-tree" "--name-only" "HEAD")))))
+      (plunger-region-blob (point-min) (point-max) filename nil tree-buf))
+    (kill-buffer http-buf)
+    (with-current-buffer tree-buf
+      (plunger-region-mktree (point-min) (point-max)))
+    (kill-buffer tree-buf)
     (if (and message
              (or (magit-no-commit-p)
                  (= 1 (magit-git-exit-code "diff-tree" "--quiet" "HEAD" tree))))
         (plunger-commit tree message)
       ;; Indicate that this isn't a commit by returning a list.
       (list tree))))
-
-(defun plunger-import-single (url filename)
-  (unless filename
-    (setq filename
-          (if (magit-no-commit-p)
-              (if (string-match "\\([^/]+\\)$" url)
-                  (match-string 1 url)
-                (error "Cannot determine local filename"))
-            (car (magit-git-lines "ls-tree" "--name-only" "HEAD")))))
-  (let ((buf (plunger--get-buffer " *plunger-mktree*")))
-    (plunger-region-blob (point-min) (point-max) filename nil buf)
-    (with-current-buffer buf
-      (plunger-region-mktree (point-min) (point-max)))))
 
 (provide 'plunger-import)
 ;; Local Variables:
