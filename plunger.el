@@ -1,11 +1,11 @@
 ;;; plunger.el --- create Git objects using plumbing commands
 
-;; Copyright (C) 2012  Jonas Bernoulli
+;; Copyright (C) 2012-2013  Jonas Bernoulli
 
 ;; Author: Jonas Bernoulli <jonas@bernoul.li>
 ;; Created: 20120112
 ;; Version: 0.2.1
-;; Status: beta
+;; Status: experimental
 ;; Homepage: http://github.com/tarsius/plunger
 ;; Keywords: compile, convenience, lisp
 
