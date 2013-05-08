@@ -4,7 +4,7 @@
 
 ;; Author: Jonas Bernoulli <jonas@bernoul.li>
 ;; Created: 20120112
-;; Version: 0.2.1
+;; Version: 0.2.2
 ;; Status: experimental
 ;; Homepage: http://github.com/tarsius/plunger
 ;; Keywords: compile, convenience, lisp
