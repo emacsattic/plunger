@@ -87,11 +87,10 @@
       (magit-run-git "update-ref" (magit-get-ref "HEAD") commit)
       (magit-git-string "rev-parse" "HEAD"))))
 
-(defun plunger--get-buffer (name &optional noerase)
-  (let ((buf (get-buffer-create name))
-        (inhibit-read-only t))
+(defun plunger--get-buffer (name)
+  (let ((buf (get-buffer-create name)))
     (with-current-buffer buf
-      (unless noerase
+      (let ((inhibit-read-only t))
         (erase-buffer))
       (setq buffer-read-only t))
     buf))
