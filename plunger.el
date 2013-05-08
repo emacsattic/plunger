@@ -31,6 +31,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'magit)
 
 (defun plunger-region-blob (from to &optional filename permissions destination)
@@ -74,7 +75,7 @@
 (defvar plunger-pre-commit-hook nil)
 
 (defun plunger-commit (tree message)
-  (let ((process-environment (copy-list process-environment))
+  (let ((process-environment (cl-copy-list process-environment))
         commit)
     (run-hook-with-args 'plunger-pre-commit-hook tree)
     (setq commit
