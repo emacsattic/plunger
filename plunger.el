@@ -34,6 +34,7 @@
 (require 'cl-lib)
 (require 'magit)
 
+(declare-function elx-maintainer 'elx)
 (declare-function mm-decompress-buffer 'mm-util)
 (declare-function request 'request)
 
@@ -116,6 +117,26 @@ files then they are removed.  MESSAGE is used as commit message."
                        (cdr error-thrown)))))
   (unless (magit-get-boolean "core.bare")
     (magit-run-git "reset" "--hard" "HEAD")))
+
+(defun plunger-pull-elisp-file (url filename message)
+  (require 'elx)
+  (add-hook
+   'plunger-pre-commit-hook
+   (lambda (tree)
+     (let ((maintainer
+            (with-temp-buffer
+              (magit-git-insert
+               (list "show"
+                     (concat tree ":"
+                             (car (magit-git-lines
+                                   "ls-tree" "--name-only" tree)))))
+              (elx-maintainer))))
+       (setenv "GIT_AUTHOR_NAME"  (or (car maintainer) "unknown"))
+       (setenv "GIT_AUTHOR_EMAIL" (or (cdr maintainer) "unknown"))
+       (setenv "GIT_COMMITTER_NAME"  user-full-name)
+       (setenv "GIT_COMMITTER_EMAIL" user-mail-address)))
+   nil t)
+  (plunger-pull-file url filename message))
 
 (provide 'plunger)
 ;; Local Variables:
