@@ -1,4 +1,4 @@
-;;; plunger.el --- create Git objects using plumbing commands
+;;; plunger.el --- use Git plumbing commands on the region
 
 ;; Copyright (C) 2012-2013  Jonas Bernoulli
 
@@ -26,54 +26,52 @@
 
 ;;; Commentary:
 
-;; This package provides some functions wrapping Git plumbing
-;; commands for creating blobs, trees and commits.
+;; This package provides function which use the Git plumbing commands
+;; `hash-object', `mktree' and `commit-tree' on the active region.
 
 ;;; Code:
 
 (require 'cl-lib)
 (require 'magit)
 
-(declare-function url-http-parse-response 'url-http)
 (declare-function mm-decompress-buffer 'mm-util)
+(declare-function request 'request)
 
-(defun plunger-region-blob (from to &optional filename permissions destination)
-  (let ((buf (plunger--get-buffer " *plunger-blob*"))
-        (inhibit-read-only t)
-        hash)
-    (unless (= 0 (apply 'call-process-region
-                        from to magit-git-executable
-                        nil (list buf nil) nil
-                        (append magit-git-standard-options
-                                (list "hash-object" "--stdin")
-                                (when destination
-                                  (list "-w"))
-                                (when filename
-                                  (list "--path" filename)))))
+(defun plunger-region-blob (from to &optional filename perms)
+  (interactive "r")
+  (let ((inhibit-read-only t)
+        (inhibit-point-motion-hooks t))
+    (goto-char to)
+    (when (> (call-process-region from to magit-git-executable
+                                  nil t nil
+                                  "hash-object" "--stdin" "-w") 0)
       (error "Cannot hash object"))
-    (with-current-buffer buf
-      (setq hash (magit-trim-line (buffer-string))))
-    (kill-buffer buf)
-    (when (and filename destination)
-      (with-current-buffer destination
-        (goto-char (point-max))
-        (let ((standard-output (current-buffer))
-              (inhibit-read-only t))
-          (princ (format "%s blob %s\t%s\n"
-                         (or permissions "100644")
-                         hash filename)))))
-    hash))
+    (kill-region from to)
+    (backward-char)
+    (goto-char (line-beginning-position))
+    (insert (or perms "100644") " blob ")
+    (goto-char (line-end-position))
+    (insert "\t" (or filename "region"))
+    (buffer-substring (line-beginning-position) (point))))
 
 (defun plunger-region-mktree (from to)
-  (let ((buf (plunger--get-buffer " *plunger-tree*")))
-    (unless (= 0 (call-process-region from to magit-git-executable
-                                      nil (list buf nil) nil
-                                      "mktree"))
+  (interactive "r")
+  (let ((inhibit-read-only t)
+        (inhibit-point-motion-hooks t))
+    (goto-char to)
+    (when (> (call-process-region from to magit-git-executable
+                                  nil t nil "mktree") 0)
       (error "Cannot make tree"))
-    (prog1 (with-current-buffer buf
-             (magit-trim-line (buffer-string)))
-      (kill-buffer buf)
-      (kill-buffer (current-buffer)))))
+    (kill-region from to)
+    (backward-char)
+    (delete-char 1)
+    (buffer-substring (line-beginning-position) (point))))
+
+(defun plunger-region-commit (from to &optional message)
+  (interactive "r")
+  (let ((inhibit-read-only t)
+        (inhibit-point-motion-hooks t))
+    (plunger-commit (buffer-substring from to) "update")))
 
 (defvar plunger-pre-commit-hook nil)
 
@@ -91,49 +89,33 @@
       (magit-run-git "update-ref" (magit-get-ref "HEAD") commit)
       (magit-git-string "rev-parse" "HEAD"))))
 
-(defun plunger--get-buffer (name)
-  (let ((buf (get-buffer-create name)))
-    (with-current-buffer buf
-      (let ((inhibit-read-only t))
-        (erase-buffer))
-      (setq buffer-read-only t))
-    buf))
-
-(defun plunger-pull-file (url &optional filename message)
+(defun plunger-pull-file (url filename message)
+  "Fetch URL and commit it in the current repository as FILENAME.
+If file is compressed first decompress it.  FILENAME must not
+contain any directory parts.  If the repository tracks other
+files then they are removed.  MESSAGE is used as commit message."
   (require 'mm-util)
-  (require 'url-http)
-  (let ((http-buf (url-retrieve-synchronously url))
-        (tree-buf (plunger--get-buffer " *plunger-mktree*"))
-        response tree)
-    (with-current-buffer http-buf
-      (setq response (url-http-parse-response))
-      (when (or (<  response 200)
-                (>= response 300))
-        (error "Error during download request: %s"
-               (buffer-substring-no-properties
-                (point) (progn (end-of-line) (point)))))
-      (re-search-forward "^$" nil 'move)
-      (forward-char)
-      (delete-region (point-min) (point))
-      (mm-decompress-buffer (file-name-nondirectory url) t t)
-      (unless filename
-        (setq filename
-              (if (magit-no-commit-p)
-                  (if (string-match "\\([^/]+\\)$" url)
-                      (match-string 1 url)
-                    (error "Cannot determine local filename"))
-                (car (magit-git-lines "ls-tree" "--name-only" "HEAD")))))
-      (plunger-region-blob (point-min) (point-max) filename nil tree-buf))
-    (kill-buffer http-buf)
-    (with-current-buffer tree-buf
-      (plunger-region-mktree (point-min) (point-max)))
-    (kill-buffer tree-buf)
-    (if (and message
-             (or (magit-no-commit-p)
-                 (= 1 (magit-git-exit-code "diff-tree" "--quiet" "HEAD" tree))))
-        (plunger-commit tree message)
-      ;; Indicate that this isn't a commit by returning a list.
-      (list tree))))
+  (require 'request)
+  (request
+   url
+   :sync t
+   :parser  #'buffer-string
+   :success (apply-partially
+             (cl-function
+              (lambda (url filename message &key response data &allow-other-keys)
+                (with-temp-buffer
+                  (insert data)
+                  (mm-decompress-buffer  (file-name-nondirectory url) t t)
+                  (plunger-region-blob   (point-min) (point-max) filename)
+                  (plunger-region-mktree (point-min) (point-max))
+                  (plunger-region-commit (point-min) (point-max) message))))
+             url filename message)
+   :error   (cl-function
+             (lambda (&key error-thrown &allow-other-keys)
+               (signal (car error-thrown)
+                       (cdr error-thrown)))))
+  (unless (magit-get-boolean "core.bare")
+    (magit-run-git "reset" "--hard" "HEAD")))
 
 (provide 'plunger)
 ;; Local Variables:
