@@ -34,6 +34,9 @@
 (require 'cl-lib)
 (require 'magit)
 
+(declare-function url-http-parse-response 'url-http)
+(declare-function mm-decompress-buffer 'mm-util)
+
 (defun plunger-region-blob (from to &optional filename permissions destination)
   (let ((buf (plunger--get-buffer " *plunger-blob*"))
         (inhibit-read-only t)
@@ -95,6 +98,42 @@
         (erase-buffer))
       (setq buffer-read-only t))
     buf))
+
+(defun plunger-pull-file (url &optional filename message)
+  (require 'mm-util)
+  (require 'url-http)
+  (let ((http-buf (url-retrieve-synchronously url))
+        (tree-buf (plunger--get-buffer " *plunger-mktree*"))
+        response tree)
+    (with-current-buffer http-buf
+      (setq response (url-http-parse-response))
+      (when (or (<  response 200)
+                (>= response 300))
+        (error "Error during download request: %s"
+               (buffer-substring-no-properties
+                (point) (progn (end-of-line) (point)))))
+      (re-search-forward "^$" nil 'move)
+      (forward-char)
+      (delete-region (point-min) (point))
+      (mm-decompress-buffer (file-name-nondirectory url) t t)
+      (unless filename
+        (setq filename
+              (if (magit-no-commit-p)
+                  (if (string-match "\\([^/]+\\)$" url)
+                      (match-string 1 url)
+                    (error "Cannot determine local filename"))
+                (car (magit-git-lines "ls-tree" "--name-only" "HEAD")))))
+      (plunger-region-blob (point-min) (point-max) filename nil tree-buf))
+    (kill-buffer http-buf)
+    (with-current-buffer tree-buf
+      (plunger-region-mktree (point-min) (point-max)))
+    (kill-buffer tree-buf)
+    (if (and message
+             (or (magit-no-commit-p)
+                 (= 1 (magit-git-exit-code "diff-tree" "--quiet" "HEAD" tree))))
+        (plunger-commit tree message)
+      ;; Indicate that this isn't a commit by returning a list.
+      (list tree))))
 
 (provide 'plunger)
 ;; Local Variables:
