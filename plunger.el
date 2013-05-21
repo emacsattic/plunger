@@ -80,15 +80,17 @@
   (let ((process-environment (cl-copy-list process-environment))
         commit)
     (run-hook-with-args 'plunger-pre-commit-hook tree)
-    (setq commit
-          (apply 'magit-git-string "commit-tree" tree
-                 "-m" message
-                 (unless (magit-no-commit-p)
-                   (list "-p" (magit-git-string "rev-parse" "HEAD")))))
-    (if (not commit)
-        (error "Cannot commit tree")
-      (magit-run-git "update-ref" (magit-get-ref "HEAD") commit)
-      (magit-git-string "rev-parse" "HEAD"))))
+    (if (equal tree (magit-git-string "rev-parse" "HEAD^{tree}"))
+        (message "Refusing to make an empty commit")
+      (setq commit
+            (apply 'magit-git-string "commit-tree" tree
+                   "-m" message
+                   (unless (magit-no-commit-p)
+                     (list "-p" (magit-git-string "rev-parse" "HEAD")))))
+      (if (not commit)
+          (error "Cannot commit tree")
+        (magit-run-git "update-ref" (magit-get-ref "HEAD") commit)
+        (magit-git-string "rev-parse" "HEAD")))))
 
 (defun plunger-pull-file (url filename message)
   "Fetch URL and commit it in the current repository as FILENAME.
