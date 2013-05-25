@@ -81,7 +81,7 @@
         commit)
     (run-hook-with-args 'plunger-pre-commit-hook tree)
     (if (equal tree (magit-git-string "rev-parse" "HEAD^{tree}"))
-        (message "Refusing to make an empty commit")
+        (progn (message "Refusing to make an empty commit") nil)
       (setq commit
             (apply 'magit-git-string "commit-tree" tree
                    "-m" message
