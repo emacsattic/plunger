@@ -89,7 +89,8 @@
                      (list "-p" (magit-git-string "rev-parse" "HEAD")))))
       (if (not commit)
           (error "Cannot commit tree")
-        (magit-run-git "update-ref" (magit-get-ref "HEAD") commit)
+        (magit-run-git "update-ref" (magit-git-string "symbolic-ref" "HEAD")
+                       commit)
         (magit-git-string "rev-parse" "HEAD")))))
 
 (defun plunger-pull-file (url filename message)
