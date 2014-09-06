@@ -34,7 +34,7 @@
 (require 'cl-lib)
 (require 'magit)
 
-(declare-function elx-maintainer 'elx)
+(declare-function elx-maintainers 'elx)
 (declare-function mm-decompress-buffer 'mm-util)
 (declare-function request 'request)
 
@@ -132,7 +132,7 @@ files then they are removed.  MESSAGE is used as commit message."
                      (concat tree ":"
                              (car (magit-git-lines
                                    "ls-tree" "--name-only" tree)))))
-              (elx-maintainer))))
+              (car (elx-maintainers)))))
        (setenv "GIT_AUTHOR_NAME"  (or (car maintainer) "unknown"))
        (setenv "GIT_AUTHOR_EMAIL" (or (cdr maintainer) "unknown"))
        (setenv "GIT_COMMITTER_NAME"  user-full-name)
