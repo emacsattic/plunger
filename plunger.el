@@ -1,10 +1,9 @@
 ;;; plunger.el --- use Git plumbing commands on the region
 
-;; Copyright (C) 2012-2013  Jonas Bernoulli
+;; Copyright (C) 2012-2014  Jonas Bernoulli
 
 ;; Author: Jonas Bernoulli <jonas@bernoul.li>
 ;; Created: 20120112
-;; Version: 0.2.2
 ;; Status: experimental
 ;; Homepage: http://github.com/tarsius/plunger
 ;; Keywords: compile, convenience, lisp
